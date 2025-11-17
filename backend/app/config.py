@@ -54,7 +54,10 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     class Config:
-        env_file = ".env"
+        # Asegurar que la configuración busque el archivo .env dentro de la carpeta `backend`
+        # usando una ruta absoluta relativa al paquete `app`. Esto evita problemas cuando
+        # Uvicorn se ejecuta desde otra carpeta (ej. la raíz del repo).
+        env_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
         case_sensitive = True
         extra = "allow"  # Permite campos extra sin error
 
