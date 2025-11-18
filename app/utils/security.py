@@ -1,7 +1,7 @@
 """
 Utilidades de seguridad: hash de contraseñas, JWT, etc.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Union, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -150,23 +150,38 @@ def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM]
         )
-        
-        # Verificar tipo de token
-        if payload.get("type") != token_type:
-            return None
-        
-        # Verificar expiración
-        exp = payload.get("exp")
-        if exp is None:
-            return None
-        
-        if datetime.fromtimestamp(exp) < datetime.utcnow():
-            return None
-        
-        return payload
-        
-    except JWTError:
+
+    except Exception as e:
+        # Log detallado para depuración: fallo al decodificar/verificar firma
+        # No registramos el token completo para evitar exposición accidental en logs.
+        short_token = (token[:8] + "..." + token[-8:]) if token and len(token) > 32 else token
+        logger.debug("verify_token: jwt.decode failed for token=%s error=%s", short_token, str(e))
         return None
+
+    # Verificar tipo de token
+    if payload.get("type") != token_type:
+        logger.debug("verify_token: token type mismatch, expected=%s got=%s", token_type, payload.get("type"))
+        return None
+
+    # Verificar expiración (usar UTC para evitar errores por zonas horarias)
+    exp = payload.get("exp")
+    if exp is None:
+        logger.debug("verify_token: token has no 'exp' claim")
+        return None
+
+    # Comparar usando timestamps en UTC (aware)
+    try:
+        exp_dt = datetime.fromtimestamp(exp, timezone.utc)
+    except Exception as e:
+        logger.debug("verify_token: invalid 'exp' claim value=%s error=%s", str(exp), str(e))
+        return None
+
+    if exp_dt < datetime.now(timezone.utc):
+        logger.debug("verify_token: token expired at %s (now=%s)", exp_dt.isoformat(), datetime.now(timezone.utc).isoformat())
+        return None
+
+    logger.debug("verify_token: token valid for sub=%s type=%s exp=%s", payload.get("sub"), payload.get("type"), exp_dt.isoformat())
+    return payload
 
 
 def decode_token(token: str) -> Optional[dict]:
