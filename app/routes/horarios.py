@@ -46,7 +46,23 @@ async def get_my_horario(
         
         # Obtener horarios del grupo
         response = db.table("horario").select("*").eq("id_grupo", id_grupo).order("dia_semana, hora_inicio").execute()
-        return response.data
+        
+        # Obtener todas las materias del grupo
+        materias_response = db.table("grupomateria").select("*, materia(*)").eq("id_grupo", id_grupo).execute()
+        materias_dict = {gm["id_grupo_materia"]: gm["materia"] for gm in materias_response.data}
+        
+        # Agregar información de materia a cada horario
+        # Como no tenemos id_materia en horario, asignaremos la primera materia encontrada
+        # o None si no hay materias
+        primera_materia = materias_response.data[0]["materia"] if materias_response.data else None
+        
+        horarios = []
+        for h in response.data:
+            horario = dict(h)
+            horario["materia"] = primera_materia
+            horarios.append(horario)
+        
+        return horarios
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -59,8 +75,55 @@ async def get_horario_grupo(
 ):
     """Obtener horarios de un grupo específico"""
     try:
+        # Obtener horarios del grupo
         response = db.table("horario").select("*").eq("id_grupo", id_grupo).order("dia_semana, hora_inicio").execute()
-        return response.data
+        
+        # Obtener todas las materias del grupo
+        materias_response = db.table("grupomateria").select("*, materia(*)").eq("id_grupo", id_grupo).execute()
+        primera_materia = materias_response.data[0]["materia"] if materias_response.data else None
+        
+        # Agregar información de materia a cada horario
+        horarios = []
+        for h in response.data:
+            horario = dict(h)
+            horario["materia"] = primera_materia
+            horarios.append(horario)
+        
+        return horarios
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/estudiante/{ci_est}", response_model=List[Horario])
+async def get_horario_estudiante(
+    ci_est: str,
+    db: Client = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Obtener horarios de un estudiante por su CI"""
+    try:
+        # Obtener grupo del estudiante
+        est_response = db.table("estudiante").select("id_grupo").eq("ci_est", ci_est).execute()
+        if not est_response.data or not est_response.data[0].get("id_grupo"):
+            return []
+        
+        id_grupo = est_response.data[0]["id_grupo"]
+        
+        # Obtener horarios del grupo
+        response = db.table("horario").select("*").eq("id_grupo", id_grupo).order("dia_semana, hora_inicio").execute()
+        
+        # Obtener todas las materias del grupo
+        materias_response = db.table("grupomateria").select("*, materia(*)").eq("id_grupo", id_grupo).execute()
+        primera_materia = materias_response.data[0]["materia"] if materias_response.data else None
+        
+        # Agregar información de materia a cada horario
+        horarios = []
+        for h in response.data:
+            horario = dict(h)
+            horario["materia"] = primera_materia
+            horarios.append(horario)
+        
+        return horarios
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 

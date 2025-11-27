@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     # Configuración de seguridad
     SECRET_KEY: str = os.getenv("SECRET_KEY", "red-social-univalle-2025-super-secret-key-change-in-production")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "43200"))  # 30 días
+    REFRESH_TOKEN_EXPIRE_DAYS: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "90"))  # 90 días
     
     # Configuración de CORS
     CORS_ORIGINS: Optional[str] = '["http://localhost:3000", "http://127.0.0.1:3000"]'
@@ -54,10 +54,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     class Config:
-        # Asegurar que la configuración busque el archivo .env dentro de la carpeta `backend`
-        # usando una ruta absoluta relativa al paquete `app`. Esto evita problemas cuando
-        # Uvicorn se ejecuta desde otra carpeta (ej. la raíz del repo).
-        env_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
+        env_file = ".env"
         case_sensitive = True
         extra = "allow"  # Permite campos extra sin error
 

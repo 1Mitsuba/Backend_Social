@@ -26,7 +26,7 @@ class PublicacionBase(BaseModel):
 
 class PublicacionCreate(PublicacionBase):
     """Modelo para crear una publicación"""
-    id_user: str
+    id_user: Optional[str] = None  # Opcional, se asigna automáticamente desde el token JWT
     media_urls: Optional[List[str]] = []  # URLs de archivos multimedia
 
 
@@ -60,7 +60,7 @@ class ComentarioBase(BaseModel):
 
 class ComentarioCreate(ComentarioBase):
     """Modelo para crear un comentario"""
-    pass
+    id_user: Optional[str] = None  # Opcional, se asigna automáticamente desde el token JWT
 
 
 class ComentarioUpdate(BaseModel):

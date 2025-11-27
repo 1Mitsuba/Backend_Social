@@ -32,60 +32,69 @@ async def get_current_user(
     import logging
     logger = logging.getLogger(__name__)
     
-    # Verificar token
+    # Obtener token
     token = credentials.credentials
-    logger.debug(f"Token recibido: {token[:30]}...")
+    logger.debug(f"Token recibido (primeros 30 chars): {token[:30]}...")
     
-    # Asegurarse de que el token no tenga 'Bearer' incluido
+    # Limpiar token - remover 'Bearer' si está duplicado
     if token.startswith('Bearer '):
-        token = token.replace('Bearer ', '')
-        logger.warning("Se detectó 'Bearer' en el token, removiendo...")
+        token = token.replace('Bearer ', '').strip()
+        logger.debug("Removido 'Bearer' duplicado del token")
     
+    # Verificar token
     payload = verify_token(token, token_type="access")
-    logger.info(f"Resultado de verificación: {payload}")
     
     if payload is None:
-        logger.warning("Token inválido o expirado")
+        logger.warning("Token inválido o expirado al intentar autenticar")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado",
+            detail="Token inválido o expirado. Por favor, inicia sesión nuevamente.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Extraer ID de usuario del payload
     user_id: str = payload.get("sub")
     if user_id is None:
+        logger.error("Token sin 'sub' (user_id)")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No se pudo validar las credenciales",
+            detail="Token mal formado. No se pudo validar las credenciales.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    logger.debug(f"Usuario ID del token: {user_id}")
     
     # Obtener usuario de la base de datos
     try:
         response = db.table("usuario").select("*").eq("id_user", user_id).execute()
         
         if not response.data or len(response.data) == 0:
+            logger.warning(f"Usuario {user_id} no encontrado en BD")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Usuario no encontrado"
+                detail="Usuario no encontrado. El usuario puede haber sido eliminado."
             )
         
         user = response.data[0]
         
         # Verificar que el usuario esté activo
         if not user.get("activo", True):
+            logger.warning(f"Usuario {user_id} está inactivo")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Usuario inactivo"
+                detail="Usuario inactivo. Contacta al administrador."
             )
         
+        logger.debug(f"Usuario autenticado exitosamente: {user.get('correo')}")
         return user
         
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error al obtener usuario de BD: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al obtener usuario: {str(e)}"
+            detail=f"Error interno al obtener usuario: {str(e)}"
         )
 
 

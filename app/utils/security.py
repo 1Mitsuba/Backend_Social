@@ -1,13 +1,11 @@
 """
 Utilidades de seguridad: hash de contraseñas, JWT, etc.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional, Union, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.config import settings
-from passlib.exc import UnknownHashError
-import logging
 
 # Contexto para hash de contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -24,19 +22,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True si coinciden, False si no
     """
-    logger = logging.getLogger(__name__)
-    if not hashed_password:
-        return False
-    try:
-        return pwd_context.verify(plain_password, hashed_password)
-    except UnknownHashError as e:
-        # Hash almacenado no reconocido por passlib (ej. migración desde otro sistema)
-        logger.warning("verify_password: unknown hash format for user password: %s", str(e))
-        return False
-    except Exception as e:
-        # Cualquier otro error en la verificación no debe provocar 500; tratamos como credenciales inválidas
-        logger.exception("verify_password: unexpected error while verifying password: %s", str(e))
-        return False
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
@@ -143,45 +129,56 @@ def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
     # Remover 'Bearer' si está presente
     if token.startswith('Bearer '):
         token = token.replace('Bearer ', '')
-        logger.warning("'Bearer' detectado en el token y removido")
+        logger.debug("'Bearer' detectado en el token y removido")
+    
+    # Limpiar espacios
+    token = token.strip()
+    
     try:
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM]
         )
-
+        
+        # Verificar tipo de token
+        if payload.get("type") != token_type:
+            logger.warning(f"Tipo de token incorrecto. Esperado: {token_type}, Recibido: {payload.get('type')}")
+            return None
+        
+        # Verificar expiración
+        exp = payload.get("exp")
+        if exp is None:
+            logger.warning("Token sin fecha de expiración")
+            return None
+        
+        # Usar datetime.utcnow() consistentemente
+        exp_datetime = datetime.utcfromtimestamp(exp)
+        now = datetime.utcnow()
+        
+        if exp_datetime < now:
+            tiempo_expirado = (now - exp_datetime).total_seconds()
+            logger.info(f"Token expirado hace {tiempo_expirado} segundos")
+            return None
+        
+        # Token válido - calcular tiempo restante
+        tiempo_restante = (exp_datetime - now).total_seconds()
+        logger.debug(f"Token válido. Expira en {tiempo_restante/3600:.2f} horas")
+        
+        return payload
+        
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token expirado (ExpiredSignatureError)")
+        return None
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"Token inválido: {str(e)}")
+        return None
+    except JWTError as e:
+        logger.error(f"Error JWT: {str(e)}")
+        return None
     except Exception as e:
-        # Log detallado para depuración: fallo al decodificar/verificar firma
-        # No registramos el token completo para evitar exposición accidental en logs.
-        short_token = (token[:8] + "..." + token[-8:]) if token and len(token) > 32 else token
-        logger.debug("verify_token: jwt.decode failed for token=%s error=%s", short_token, str(e))
+        logger.error(f"Error inesperado al verificar token: {str(e)}")
         return None
-
-    # Verificar tipo de token
-    if payload.get("type") != token_type:
-        logger.debug("verify_token: token type mismatch, expected=%s got=%s", token_type, payload.get("type"))
-        return None
-
-    # Verificar expiración (usar UTC para evitar errores por zonas horarias)
-    exp = payload.get("exp")
-    if exp is None:
-        logger.debug("verify_token: token has no 'exp' claim")
-        return None
-
-    # Comparar usando timestamps en UTC (aware)
-    try:
-        exp_dt = datetime.fromtimestamp(exp, timezone.utc)
-    except Exception as e:
-        logger.debug("verify_token: invalid 'exp' claim value=%s error=%s", str(exp), str(e))
-        return None
-
-    if exp_dt < datetime.now(timezone.utc):
-        logger.debug("verify_token: token expired at %s (now=%s)", exp_dt.isoformat(), datetime.now(timezone.utc).isoformat())
-        return None
-
-    logger.debug("verify_token: token valid for sub=%s type=%s exp=%s", payload.get("sub"), payload.get("type"), exp_dt.isoformat())
-    return payload
 
 
 def decode_token(token: str) -> Optional[dict]:

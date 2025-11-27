@@ -101,7 +101,8 @@ async def get_estudiantes(
     Obtener lista de estudiantes
     """
     try:
-        query = db.table("estudiante").select("*, Usuario(*)")
+        # Obtener estudiantes
+        query = db.table("estudiante").select("*")
         
         if carrera:
             query = query.eq("carrera", carrera)
@@ -109,9 +110,32 @@ async def get_estudiantes(
             query = query.eq("semestre", semestre)
         
         query = query.range(skip, skip + limit - 1)
-        response = query.execute()
+        estudiantes_response = query.execute()
         
-        return response.data
+        if not estudiantes_response.data:
+            return []
+        
+        # Obtener IDs de usuario únicos
+        user_ids = [est["id_user"] for est in estudiantes_response.data if est.get("id_user")]
+        
+        if not user_ids:
+            return estudiantes_response.data
+        
+        # Obtener datos de usuarios
+        usuarios_response = db.table("usuario").select("*").in_("id_user", user_ids).execute()
+        
+        # Crear mapa de usuarios
+        usuarios_map = {u["id_user"]: {k: v for k, v in u.items() if k != "contrasena"} for u in usuarios_response.data}
+        
+        # Combinar datos
+        result = []
+        for est in estudiantes_response.data:
+            estudiante = {**est}
+            if est.get("id_user") in usuarios_map:
+                estudiante["id_user"] = usuarios_map[est["id_user"]]
+            result.append(estudiante)
+        
+        return result
         
     except Exception as e:
         raise HTTPException(
@@ -135,7 +159,8 @@ async def get_my_estudiante_data(
         )
     
     try:
-        response = db.table("estudiante").select("*, Usuario(*)").eq("id_user", current_user["id_user"]).execute()
+        # Obtener estudiante
+        response = db.table("estudiante").select("*").eq("id_user", current_user["id_user"]).execute()
         
         if not response.data:
             raise HTTPException(
@@ -143,7 +168,15 @@ async def get_my_estudiante_data(
                 detail="Datos de estudiante no encontrados"
             )
         
-        return response.data[0]
+        estudiante = response.data[0]
+        
+        # Obtener datos del usuario
+        user_response = db.table("usuario").select("*").eq("id_user", current_user["id_user"]).execute()
+        if user_response.data:
+            usuario_data = {k: v for k, v in user_response.data[0].items() if k != "contrasena"}
+            estudiante["id_user"] = usuario_data
+        
+        return estudiante
         
     except HTTPException:
         raise
@@ -164,7 +197,8 @@ async def get_estudiante(
     Obtener un estudiante por CI
     """
     try:
-        response = db.table("estudiante").select("*, Usuario(*)").eq("ci_est", ci_est).execute()
+        # Obtener estudiante
+        response = db.table("estudiante").select("*").eq("ci_est", ci_est).execute()
         
         if not response.data:
             raise HTTPException(
@@ -172,7 +206,16 @@ async def get_estudiante(
                 detail="Estudiante no encontrado"
             )
         
-        return response.data[0]
+        estudiante = response.data[0]
+        
+        # Obtener datos del usuario
+        if estudiante.get("id_user"):
+            user_response = db.table("usuario").select("*").eq("id_user", estudiante["id_user"]).execute()
+            if user_response.data:
+                usuario_data = {k: v for k, v in user_response.data[0].items() if k != "contrasena"}
+                estudiante["id_user"] = usuario_data
+        
+        return estudiante
         
     except HTTPException:
         raise

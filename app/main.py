@@ -18,7 +18,7 @@ from app.routes import auth, usuarios, estudiantes, docentes
 from app.routes import materias, notas, horarios, grupos
 from app.routes import publicaciones, comentarios, reacciones
 from app.routes import mensajes, notificaciones
-from app.routes import rutas, pasajeros
+from app.routes import rutas, pasajeros, upload, amigos
 
 # Configurar logging
 logging.basicConfig(
@@ -185,10 +185,14 @@ app.include_router(grupos.router, prefix=api_prefix, tags=["Grupos"])
 app.include_router(publicaciones.router, prefix=api_prefix, tags=["Publicaciones"])
 app.include_router(comentarios.router, prefix=api_prefix, tags=["Comentarios"])
 app.include_router(reacciones.router, prefix=api_prefix, tags=["Reacciones"])
+app.include_router(upload.router, prefix=api_prefix, tags=["Upload"])
 
 # Mensajería
 app.include_router(mensajes.router, prefix=api_prefix, tags=["Mensajes"])
 app.include_router(notificaciones.router, prefix=api_prefix, tags=["Notificaciones"])
+
+# Amigos
+app.include_router(amigos.router, prefix=api_prefix, tags=["Amigos"])
 
 # Carpooling
 app.include_router(rutas.router, prefix=api_prefix, tags=["Rutas Carpooling"])

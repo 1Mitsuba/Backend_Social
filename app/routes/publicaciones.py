@@ -23,19 +23,28 @@ async def create_publicacion(
         pub_dict = publicacion_data.dict(exclude={"media_urls"})
         pub_dict["id_user"] = current_user["id_user"]
         response = db.table("publicacion").insert(pub_dict).execute()
-        publicacion = response.data[0]
+        publicacion_id = response.data[0]["id_publicacion"]
         
         # Crear registros de media si hay URLs
         if publicacion_data.media_urls:
             for url in publicacion_data.media_urls:
+                # Detectar tipo de media basado en la extensión
+                tipo_media = "imagen"
+                if any(ext in url.lower() for ext in ['.mp4', '.webm', '.mov', '.avi']):
+                    tipo_media = "video"
+                elif any(ext in url.lower() for ext in ['.pdf', '.doc', '.docx']):
+                    tipo_media = "documento"
+                
                 media_dict = {
-                    "tipo": "imagen",  # Detectar tipo automáticamente en prod
+                    "tipo": tipo_media,
                     "url": url,
-                    "id_publicacion": publicacion["id_publicacion"]
+                    "id_publicacion": publicacion_id
                 }
                 db.table("media").insert(media_dict).execute()
         
-        return publicacion
+        # Obtener la publicación completa con información del usuario y media
+        publicacion_completa = db.table("publicacion").select("*, usuario(nombre, apellido, foto_perfil), media(*)").eq("id_publicacion", publicacion_id).single().execute()
+        return publicacion_completa.data
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -49,8 +58,21 @@ async def get_publicaciones(
 ):
     """Obtener feed de publicaciones"""
     try:
-        response = db.table("publicacion").select("*, usuario(nombre, apellido, foto_perfil)").order("fecha_creacion", desc=True).range(skip, skip + limit - 1).execute()
-        return response.data
+        # Obtener publicaciones con información del usuario y media
+        response = db.table("publicacion").select("*, usuario(nombre, apellido, foto_perfil), media(*)").order("fecha_creacion", desc=True).range(skip, skip + limit - 1).execute()
+        
+        # Agregar contadores de comentarios y reacciones
+        publicaciones = response.data
+        for pub in publicaciones:
+            # Contar comentarios
+            comentarios_response = db.table("comentario").select("id_comentario", count="exact").eq("id_publicacion", pub["id_publicacion"]).execute()
+            pub["comentarios_count"] = comentarios_response.count or 0
+            
+            # Contar reacciones
+            reacciones_response = db.table("reaccion").select("id_reaccion", count="exact").eq("id_publicacion", pub["id_publicacion"]).execute()
+            pub["reacciones_count"] = reacciones_response.count or 0
+        
+        return publicaciones
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 

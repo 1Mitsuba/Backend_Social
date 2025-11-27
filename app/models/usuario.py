@@ -109,8 +109,7 @@ class EstudianteInDB(EstudianteBase):
 class Estudiante(EstudianteBase):
     """Modelo de estudiante para respuestas"""
     ci_est: str
-    id_user: str
-    usuario: Optional[Usuario] = None
+    id_user: dict  # Objeto con datos del usuario (sin contraseña)
 
     class Config:
         from_attributes = True

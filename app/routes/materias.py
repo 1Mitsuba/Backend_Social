@@ -33,9 +33,10 @@ async def get_materias(
     db: Client = Depends(get_db),
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Obtener lista de materias"""
+    """Obtener lista de materias con información del docente"""
     try:
-        response = db.table("materia").select("*").range(skip, skip + limit - 1).execute()
+        # Incluir información del docente y su usuario
+        response = db.table("materia").select("*, docente:id_doc(ci_doc, usuario:id_user(*))").range(skip, skip + limit - 1).execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

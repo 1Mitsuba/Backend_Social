@@ -17,6 +17,7 @@ from app.routes import (
     notificaciones,
     rutas,
     pasajeros,
+    upload,
 )
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "notificaciones",
     "rutas",
     "pasajeros",
+    "upload",
 ]

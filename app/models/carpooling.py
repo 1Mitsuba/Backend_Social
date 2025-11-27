@@ -104,9 +104,10 @@ class PasajeroRutaBase(BaseModel):
     estado: EstadoPasajeroEnum = EstadoPasajeroEnum.PENDIENTE
 
 
-class PasajeroRutaCreate(PasajeroRutaBase):
+class PasajeroRutaCreate(BaseModel):
     """Modelo para postular como pasajero"""
-    id_user: str  # Pasajero
+    id_ruta: str
+    estado: EstadoPasajeroEnum = EstadoPasajeroEnum.PENDIENTE
 
 
 class PasajeroRutaUpdate(BaseModel):

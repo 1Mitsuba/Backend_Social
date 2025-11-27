@@ -141,6 +141,50 @@ async def send_mensaje(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+@router.get("/conversacion/{id_conversacion}/info")
+async def get_conversacion_info(
+    id_conversacion: str,
+    db: Client = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Obtener información detallada de una conversación incluyendo todos los participantes"""
+    try:
+        # Verificar que el usuario está en la conversación
+        user_conv = db.table("usuarioconversacion").select("*").eq("id_conversacion", id_conversacion).eq("id_usuario", current_user["id_user"]).execute()
+        if not user_conv.data:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes acceso a esta conversación")
+        
+        # Obtener datos de la conversación
+        conv_response = db.table("conversacion").select("*").eq("id_conversacion", id_conversacion).single().execute()
+        conversacion = conv_response.data
+        
+        # Obtener IDs de participantes
+        participantes_ids = db.table("usuarioconversacion")\
+            .select("id_usuario")\
+            .eq("id_conversacion", id_conversacion)\
+            .execute()
+        
+        # Obtener información de cada participante
+        participantes = []
+        for p in participantes_ids.data:
+            user_data = db.table("usuario")\
+                .select("*")\
+                .eq("id_user", p["id_usuario"])\
+                .single()\
+                .execute()
+            if user_data.data:
+                participantes.append(user_data.data)
+        
+        conversacion["participantes"] = participantes
+        conversacion["total_participantes"] = len(participantes)
+        
+        return conversacion
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/conversacion/{id_conversacion}", response_model=List[Mensaje])
 async def get_mensajes_conversacion(
     id_conversacion: str,

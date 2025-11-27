@@ -23,7 +23,29 @@ async def create_comentario(
         com_dict = comentario_data.dict()
         com_dict["id_user"] = current_user["id_user"]
         response = db.table("comentario").insert(com_dict).execute()
-        return response.data[0]
+        comentario_id = response.data[0]["id_comentario"]
+        
+        # Obtener el comentario con la información del usuario
+        comentario_completo = db.table("comentario").select("*, usuario(nombre, apellido, foto_perfil)").eq("id_comentario", comentario_id).single().execute()
+        
+        # Crear notificación para el autor de la publicación
+        try:
+            publicacion = db.table("publicacion").select("id_user, contenido").eq("id_publicacion", comentario_data.id_publicacion).single().execute()
+            if publicacion.data and publicacion.data["id_user"] != current_user["id_user"]:
+                # Solo notificar si el comentarista no es el autor
+                nombre_completo = f"{current_user.get('nombre', '')} {current_user.get('apellido', '')}".strip()
+                notificacion_data = {
+                    "contenido": f"{nombre_completo} comentó en tu publicación",
+                    "tipo": "comentario",
+                    "id_user": publicacion.data["id_user"],
+                    "leida": False
+                }
+                db.table("notificacion").insert(notificacion_data).execute()
+        except Exception as notif_error:
+            # No fallar si la notificación falla
+            print(f"Error creando notificación: {notif_error}")
+        
+        return comentario_completo.data
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 

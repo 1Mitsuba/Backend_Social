@@ -17,15 +17,33 @@ def get_supabase_client() -> Client:
     """
     global supabase
     if supabase is None:
-        try:
-            supabase = create_client(
-                settings.SUPABASE_URL,
-                settings.SUPABASE_KEY
+        # Intentar usar en orden la KEY de servicio (más permisos), luego la KEY estándar y por último la ANON
+        keys_to_try = [
+            settings.SUPABASE_SERVICE_KEY,
+            settings.SUPABASE_KEY,
+            settings.SUPABASE_ANON_KEY,
+        ]
+
+        last_exc = None
+        for key in keys_to_try:
+            if not key:
+                continue
+            try:
+                supabase = create_client(settings.SUPABASE_URL, key)
+                logger.info("✅ Conexión a Supabase establecida (key used)")
+                last_exc = None
+                break
+            except Exception as e:
+                logger.warning(f"Intento de conexión con una key fallido: {e}")
+                last_exc = e
+
+        if supabase is None:
+            msg = (
+                "No se pudo inicializar el cliente de Supabase. "
+                "Verifica que las variables de entorno SUPABASE_URL y SUPABASE_KEY (o SUPABASE_SERVICE_KEY / SUPABASE_ANON_KEY) estén definidas y sean correctas."
             )
-            logger.info("✅ Conexión a Supabase establecida")
-        except Exception as e:
-            logger.error(f"❌ Error al conectar con Supabase: {e}")
-            raise
+            logger.error(f"❌ Error al conectar con Supabase: {last_exc}")
+            raise RuntimeError(msg) from last_exc
     return supabase
 
 

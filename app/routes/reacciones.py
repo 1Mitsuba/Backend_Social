@@ -53,6 +53,24 @@ async def create_reaccion(
             reac_dict = reaccion_data.dict(exclude_unset=True)
             reac_dict["id_user"] = current_user["id_user"]  # Agregar id_user del usuario autenticado
             response = db.table("reaccion").insert(reac_dict).execute()
+            
+            # Crear notificación para el autor de la publicación/comentario
+            try:
+                if reaccion_data.id_publicacion:
+                    publicacion = db.table("publicacion").select("id_user").eq("id_publicacion", reaccion_data.id_publicacion).single().execute()
+                    if publicacion.data and publicacion.data["id_user"] != current_user["id_user"]:
+                        nombre_completo = f"{current_user.get('nombre', '')} {current_user.get('apellido', '')}".strip()
+                        emoji_reaccion = {"like": "👍", "love": "❤️", "wow": "😮", "sad": "😢", "angry": "😠"}.get(reaccion_data.tipo_reac.value, "👍")
+                        notificacion_data = {
+                            "contenido": f"{nombre_completo} reaccionó {emoji_reaccion} a tu publicación",
+                            "tipo": "reaccion",
+                            "id_user": publicacion.data["id_user"],
+                            "leida": False
+                        }
+                        db.table("notificacion").insert(notificacion_data).execute()
+            except Exception as notif_error:
+                print(f"Error creando notificación: {notif_error}")
+            
             return response.data[0]
             
     except Exception as e:

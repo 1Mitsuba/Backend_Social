@@ -95,7 +95,7 @@ class MensajeBase(BaseModel):
 
 class MensajeCreate(MensajeBase):
     """Modelo para crear un mensaje"""
-    id_user: str
+    id_user: Optional[str] = None  # Opcional, se toma del token JWT
 
 
 class MensajeUpdate(BaseModel):

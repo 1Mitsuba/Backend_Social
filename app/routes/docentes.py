@@ -98,55 +98,39 @@ async def get_docentes(
     Obtener lista de docentes
     """
     try:
-        # Primero obtener los docentes
+        # Obtener docentes
         query = db.table("docente").select("*")
-        
-        if especialidad:
-            query = query.eq("especialidad_doc", especialidad)
-            
-        docentes_response = query.range(skip, skip + limit - 1).execute()
-        
-        if not docentes_response.data:
-            return []
-            
-        # Obtener los IDs de usuario
-        user_ids = [doc["id_user"] for doc in docentes_response.data]
-        
-        # Obtener los datos de usuario correspondientes
-        usuarios_response = db.table("usuario").select("*").in_("id_user", user_ids).execute()
-        
-        if not usuarios_response.data:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Error al obtener datos de usuarios"
-            )
-            
-        # Crear un diccionario para mapear usuarios por ID
-        usuarios_map = {user["id_user"]: user for user in usuarios_response.data}
-        
-        # Combinar los datos
-        docentes = []
-        for doc in docentes_response.data:
-            usuario = usuarios_map.get(doc["id_user"])
-            if usuario:
-                # Remover contraseña del usuario
-                usuario_data = {k: v for k, v in usuario.items() if k != "contrasena"}
-                docente_data = {
-                    **doc,
-                    "usuario": usuario_data
-                }
-                docentes.append(docente_data)
-                
-        return docentes
-        query = db.table("docente").select("*, Usuario(*)")
         
         if especialidad:
             query = query.eq("especialidad_doc", especialidad)
         
         query = query.range(skip, skip + limit - 1)
-        response = query.execute()
+        docentes_response = query.execute()
         
-        return response.data
+        if not docentes_response.data:
+            return []
+        
+        # Obtener IDs de usuario únicos
+        user_ids = [doc["id_user"] for doc in docentes_response.data if doc.get("id_user")]
+        
+        if not user_ids:
+            return docentes_response.data
+        
+        # Obtener datos de usuarios
+        usuarios_response = db.table("usuario").select("*").in_("id_user", user_ids).execute()
+        
+        # Crear mapa de usuarios
+        usuarios_map = {u["id_user"]: {k: v for k, v in u.items() if k != "contrasena"} for u in usuarios_response.data}
+        
+        # Combinar datos
+        result = []
+        for doc in docentes_response.data:
+            docente = {**doc}
+            if doc.get("id_user") in usuarios_map:
+                docente["id_user"] = usuarios_map[doc["id_user"]]
+            result.append(docente)
+        
+        return result
         
     except Exception as e:
         raise HTTPException(
@@ -170,7 +154,8 @@ async def get_my_docente_data(
         )
     
     try:
-        response = db.table("docente").select("*, Usuario(*)").eq("id_user", current_user["id_user"]).execute()
+        # Obtener docente
+        response = db.table("docente").select("*").eq("id_user", current_user["id_user"]).execute()
         
         if not response.data:
             raise HTTPException(
@@ -178,7 +163,15 @@ async def get_my_docente_data(
                 detail="Datos de docente no encontrados"
             )
         
-        return response.data[0]
+        docente = response.data[0]
+        
+        # Obtener datos del usuario
+        user_response = db.table("usuario").select("*").eq("id_user", current_user["id_user"]).execute()
+        if user_response.data:
+            usuario_data = {k: v for k, v in user_response.data[0].items() if k != "contrasena"}
+            docente["id_user"] = usuario_data
+        
+        return docente
         
     except HTTPException:
         raise
