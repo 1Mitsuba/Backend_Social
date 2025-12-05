@@ -273,3 +273,88 @@ async def update_estudiante(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al actualizar estudiante: {str(e)}"
         )
+
+
+@router.post("/materias", status_code=status.HTTP_201_CREATED)
+async def asignar_materia_estudiante(
+    asignacion: dict,
+    db: Client = Depends(get_db),
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Asignar una materia al grupo del estudiante (solo administradores)
+    La asignación se hace a través de GrupoMateria
+    """
+    try:
+        ci_estudiante = asignacion.get("ci_estudiante")
+        id_materia = asignacion.get("id_materia")
+        
+        if not ci_estudiante or not id_materia:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CI de estudiante e ID de materia son requeridos"
+            )
+        
+        # Verificar que el estudiante existe y obtener su grupo
+        estudiante = db.table("estudiante").select("ci_est, id_grupo").eq("ci_est", ci_estudiante).execute()
+        if not estudiante.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Estudiante no encontrado"
+            )
+        
+        id_grupo = estudiante.data[0].get("id_grupo")
+        if not id_grupo:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El estudiante no tiene un grupo asignado. Primero asígnale un grupo."
+            )
+        
+        # Verificar que la materia existe
+        materia = db.table("materia").select("id_materia").eq("id_materia", id_materia).execute()
+        if not materia.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Materia no encontrada"
+            )
+        
+        # Verificar si la materia ya está asignada al grupo
+        existing = db.table("grupomateria")\
+            .select("*")\
+            .eq("id_grupo", id_grupo)\
+            .eq("id_materia", id_materia)\
+            .execute()
+        
+        if existing.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La materia ya está asignada al grupo de este estudiante"
+            )
+        
+        # Crear la asignación en GrupoMateria
+        asignacion_data = {
+            "id_grupo": id_grupo,
+            "id_materia": id_materia,
+            "origen": "MANUAL"
+        }
+        
+        response = db.table("grupomateria").insert(asignacion_data).execute()
+        
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error al asignar materia al grupo"
+            )
+        
+        return {
+            "message": f"Materia asignada exitosamente al grupo del estudiante",
+            "data": response.data[0]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al asignar materia: {str(e)}"
+        )

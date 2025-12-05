@@ -56,7 +56,7 @@ class GestionAcademica(GestionAcademicaBase):
 class GrupoBase(BaseModel):
     """Modelo base de grupo"""
     nombre_grupo: str = Field(..., min_length=1, max_length=100)
-    gestion_grupo: str
+    gestion_grupo: Optional[str] = None  # Gestión académica opcional
 
 
 class GrupoCreate(GrupoBase):

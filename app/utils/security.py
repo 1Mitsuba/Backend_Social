@@ -170,11 +170,8 @@ def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
     except jwt.ExpiredSignatureError:
         logger.warning("Token expirado (ExpiredSignatureError)")
         return None
-    except jwt.InvalidTokenError as e:
-        logger.warning(f"Token inválido: {str(e)}")
-        return None
     except JWTError as e:
-        logger.error(f"Error JWT: {str(e)}")
+        logger.warning(f"Token inválido: {str(e)}")
         return None
     except Exception as e:
         logger.error(f"Error inesperado al verificar token: {str(e)}")

@@ -4,6 +4,7 @@ Rutas para gestión de pasajeros en rutas de carpooling
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from supabase import Client
+from datetime import datetime
 
 from app.database import get_db
 from app.models.carpooling import PasajeroRuta, PasajeroRutaCreate, PasajeroRutaUpdate
@@ -29,8 +30,8 @@ async def postular_como_pasajero(
         if ruta.data[0]["id_user"] == current_user["id_user"]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No puedes ser pasajero de tu propia ruta")
         
-        # Verificar que no esté ya postulado
-        existing = db.table("pasajeroruta").select("*").eq("id_ruta", pasajero_data.id_ruta).eq("id_user", current_user["id_user"]).execute()
+        # Verificar que no esté ya postulado ACTIVAMENTE (pendiente o aceptado)
+        existing = db.table("pasajeroruta").select("*").eq("id_ruta", pasajero_data.id_ruta).eq("id_user", current_user["id_user"]).in_("estado", ["pendiente", "aceptado"]).execute()
         if existing.data:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya estás postulado en esta ruta")
         
@@ -38,7 +39,37 @@ async def postular_como_pasajero(
         pasajero_dict = pasajero_data.dict()
         pasajero_dict["id_user"] = current_user["id_user"]
         response = db.table("pasajeroruta").insert(pasajero_dict).execute()
-        return response.data[0]
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error al crear solicitud de pasajero")
+        
+        pasajero_creado = response.data[0]
+        id_pasajero_ruta = pasajero_creado.get("id_pasajero_ruta")
+        
+        print(f"Pasajero creado: {pasajero_creado}")
+        print(f"ID Pasajero Ruta: {id_pasajero_ruta}")
+        
+        # Crear notificación para el conductor
+        try:
+            conductor_id = ruta.data[0]["id_user"]
+            nombre_completo = f"{current_user.get('nombre', '')} {current_user.get('apellido', '')}".strip() or 'Un usuario'
+            punto_inicio = ruta.data[0].get('punto_inicio', 'Mi ubicación actual')
+            punto_destino = ruta.data[0].get('punto_destino', 'Campus Las Delicias (Univalle)')
+            
+            notificacion = {
+                "id_user": conductor_id,
+                "contenido": f"{nombre_completo} solicita unirse a tu ruta ({punto_inicio} → {punto_destino})",
+                "tipo": "solicitud_ruta",
+                "leida": False,
+                "fecha_envio": datetime.utcnow().isoformat(),
+                "id_referencia": str(id_pasajero_ruta) if id_pasajero_ruta else None
+            }
+            print(f"Creando notificación: {notificacion}")
+            db.table("notificacion").insert(notificacion).execute()
+        except Exception as e:
+            print(f"Error al crear notificación: {e}")
+        
+        return pasajero_creado
         
     except HTTPException:
         raise
@@ -88,6 +119,30 @@ async def update_estado_pasajero(
         # Actualizar estado
         update_data = pasajero_data.dict(exclude_unset=True)
         response = db.table("pasajeroruta").update(update_data).eq("id_pasajero_ruta", id_pasajero_ruta).execute()
+        
+        # Notificar al pasajero sobre la decisión
+        try:
+            pasajero_id = pasajero.data[0]["id_user"]
+            estado = update_data.get("estado")
+            if estado == "aceptado":
+                contenido = f"¡Tu solicitud para unirte a la ruta fue aceptada! 🎉"
+            elif estado == "rechazado":
+                contenido = f"Tu solicitud para unirte a la ruta fue rechazada"
+            else:
+                contenido = None
+            
+            if contenido:
+                notificacion = {
+                    "id_user": pasajero_id,
+                    "contenido": contenido,
+                    "tipo": "respuesta_ruta",
+                    "leida": False,
+                    "fecha_envio": datetime.utcnow().isoformat()
+                }
+                db.table("notificacion").insert(notificacion).execute()
+        except Exception as e:
+            print(f"Error al crear notificación de respuesta: {e}")
+        
         return response.data[0]
         
     except HTTPException:

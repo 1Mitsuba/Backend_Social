@@ -14,6 +14,7 @@ class TipoNotificacionEnum(str, Enum):
     COMENTARIO = "comentario"
     REACCION = "reaccion"
     SOLICITUD_AMISTAD = "solicitud_amistad"
+    AMISTAD_ACEPTADA = "amistad_aceptada"
     SOLICITUD_RUTA = "solicitud_ruta"
     MENSAJE = "mensaje"
     NOTA_NUEVA = "nota_nueva"
@@ -23,7 +24,7 @@ class TipoNotificacionEnum(str, Enum):
 class NotificacionBase(BaseModel):
     """Modelo base de notificación"""
     contenido: str = Field(..., min_length=1)
-    tipo: TipoNotificacionEnum
+    tipo: str
 
 
 class NotificacionCreate(NotificacionBase):
@@ -42,6 +43,7 @@ class Notificacion(NotificacionBase):
     id_user: str
     fecha_envio: datetime
     leida: bool = False
+    id_referencia: Optional[str] = None
 
     class Config:
         from_attributes = True

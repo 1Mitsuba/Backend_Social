@@ -13,7 +13,7 @@ class RutaBase(BaseModel):
     """Modelo base de ruta de carpooling"""
     punto_inicio: str = Field(..., min_length=3, max_length=200)
     punto_destino: str = Field(..., min_length=3, max_length=200)
-    hora_salida: time
+    hora_salida: str = Field(..., pattern=r'^\d{2}:\d{2}:\d{2}$')  # Formato HH:MM:SS
     dias_disponibles: str = Field(..., max_length=100)  # Ej: "Lunes,Martes,Viernes"
     capacidad_ruta: int = Field(..., ge=1, le=8)
     
@@ -30,7 +30,6 @@ class RutaBase(BaseModel):
 
 class RutaCreate(RutaBase):
     """Modelo para crear una ruta"""
-    id_user: str  # Conductor
     paradas: Optional[List[dict]] = []  # Lista de paradas intermedias
 
 
@@ -38,7 +37,7 @@ class RutaUpdate(BaseModel):
     """Modelo para actualizar una ruta"""
     punto_inicio: Optional[str] = Field(None, min_length=3, max_length=200)
     punto_destino: Optional[str] = Field(None, min_length=3, max_length=200)
-    hora_salida: Optional[time] = None
+    hora_salida: Optional[str] = Field(None, pattern=r'^\d{2}:\d{2}:\d{2}$')
     dias_disponibles: Optional[str] = Field(None, max_length=100)
     capacidad_ruta: Optional[int] = Field(None, ge=1, le=8)
     activa: Optional[bool] = None
@@ -114,7 +113,6 @@ class PasajeroRutaUpdate(BaseModel):
     """Modelo para actualizar estado de pasajero"""
     estado: EstadoPasajeroEnum
 
-
 class PasajeroRuta(PasajeroRutaBase):
     """Modelo de pasajero-ruta para respuestas"""
     id_pasajero_ruta: str
@@ -124,6 +122,7 @@ class PasajeroRuta(PasajeroRutaBase):
     ruta: Optional[dict] = None  # Información de la ruta
 
     class Config:
+        from_attributes = True
         from_attributes = True
 
 

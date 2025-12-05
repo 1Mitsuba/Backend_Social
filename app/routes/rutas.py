@@ -56,7 +56,19 @@ async def get_rutas(
             .order("fecha_creacion", desc=True)\
             .range(skip, skip + limit - 1)\
             .execute()
-        return response.data
+        
+        # Calcular pasajeros aceptados para cada ruta
+        rutas = response.data
+        for ruta in rutas:
+            pasajeros_response = db.table("pasajeroruta")\
+                .select("*")\
+                .eq("id_ruta", ruta["id_ruta"])\
+                .eq("estado", "aceptado")\
+                .execute()
+            ruta["pasajeros_aceptados"] = len(pasajeros_response.data) if pasajeros_response.data else 0
+            ruta["lugares_disponibles"] = ruta["capacidad_ruta"] - ruta["pasajeros_aceptados"]
+        
+        return rutas
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -74,6 +86,17 @@ async def get_mis_rutas(
             .eq("id_user", current_user["id_user"])\
             .execute()
         
+        # Calcular pasajeros aceptados para cada ruta como conductor
+        rutas_conductor = conductor_response.data
+        for ruta in rutas_conductor:
+            pasajeros_response = db.table("pasajeroruta")\
+                .select("*")\
+                .eq("id_ruta", ruta["id_ruta"])\
+                .eq("estado", "aceptado")\
+                .execute()
+            ruta["pasajeros_aceptados"] = len(pasajeros_response.data) if pasajeros_response.data else 0
+            ruta["lugares_disponibles"] = ruta["capacidad_ruta"] - ruta["pasajeros_aceptados"]
+        
         # Rutas como pasajero
         pasajero_response = db.table("pasajeroruta")\
             .select("*, ruta:ruta(*), usuario:usuario(nombre, apellido, foto_perfil)")\
@@ -81,7 +104,7 @@ async def get_mis_rutas(
             .execute()
         
         return {
-            "como_conductor": conductor_response.data,
+            "como_conductor": rutas_conductor,
             "como_pasajero": pasajero_response.data
         }
     except Exception as e:
@@ -102,7 +125,18 @@ async def get_ruta(
             .execute()
         if not response.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ruta no encontrada")
-        return response.data[0]
+        
+        ruta = response.data[0]
+        # Calcular pasajeros aceptados
+        pasajeros_response = db.table("pasajeroruta")\
+            .select("*")\
+            .eq("id_ruta", ruta["id_ruta"])\
+            .eq("estado", "aceptado")\
+            .execute()
+        ruta["pasajeros_aceptados"] = len(pasajeros_response.data) if pasajeros_response.data else 0
+        ruta["lugares_disponibles"] = ruta["capacidad_ruta"] - ruta["pasajeros_aceptados"]
+        
+        return ruta
     except HTTPException:
         raise
     except Exception as e:
