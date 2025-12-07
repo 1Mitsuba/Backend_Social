@@ -40,6 +40,8 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8000",
+        "https://backend-social-f3ob.onrender.com",
+        "*"  # Permitir todos los orígenes temporalmente para pruebas (REMOVER en producción)
     ]
     
     # Configuración de archivos

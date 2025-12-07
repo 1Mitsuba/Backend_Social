@@ -12,6 +12,19 @@ from app.utils.dependencies import get_current_active_user, require_docente_or_a
 router = APIRouter(prefix="/notas")
 
 
+@router.get("", response_model=List[Nota])
+async def get_all_notas(
+    db: Client = Depends(get_db),
+    current_user: dict = Depends(require_docente_or_admin)
+):
+    """Obtener todas las notas (admin/docente)"""
+    try:
+        response = db.table("nota").select("*, materia(*), usuario(*)").execute()
+        return response.data
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.post("", response_model=Nota, status_code=status.HTTP_201_CREATED)
 async def create_nota(
     nota_data: NotaCreate,
