@@ -232,6 +232,98 @@ async def marcar_mensaje_leido(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+@router.put("/{id_mensaje}", response_model=Mensaje)
+async def editar_mensaje(
+    id_mensaje: str,
+    mensaje_data: dict,
+    db: Client = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Editar un mensaje existente (solo el autor puede editarlo)"""
+    try:
+        # Verificar que el mensaje existe y pertenece al usuario actual
+        mensaje_actual = db.table("mensaje").select("*").eq("id_mensaje", id_mensaje).execute()
+        if not mensaje_actual.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mensaje no encontrado")
+        
+        if mensaje_actual.data[0]["id_user"] != current_user["id_user"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso para editar este mensaje")
+        
+        # Actualizar el mensaje
+        response = db.table("mensaje")\
+            .update({
+                "contenido": mensaje_data.get("contenido"),
+                "editado": True
+            })\
+            .eq("id_mensaje", id_mensaje)\
+            .execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Error al actualizar mensaje")
+        
+        return response.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.delete("/{id_mensaje}")
+async def eliminar_mensaje(
+    id_mensaje: str,
+    db: Client = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Eliminar un mensaje (solo el autor puede eliminarlo)"""
+    try:
+        # Verificar que el mensaje existe y pertenece al usuario actual
+        mensaje_actual = db.table("mensaje").select("*").eq("id_mensaje", id_mensaje).execute()
+        if not mensaje_actual.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mensaje no encontrado")
+        
+        if mensaje_actual.data[0]["id_user"] != current_user["id_user"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso para eliminar este mensaje")
+        
+        # Eliminar el mensaje
+        response = db.table("mensaje").delete().eq("id_mensaje", id_mensaje).execute()
+        
+        return {
+            "success": True,
+            "mensaje": "Mensaje eliminado exitosamente"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.put("/conversacion/{id_conversacion}/leer")
+async def marcar_conversacion_leida(
+    id_conversacion: str,
+    db: Client = Depends(get_db),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Marcar todos los mensajes de una conversación como leídos para el usuario actual"""
+    try:
+        # Marcar como leídos todos los mensajes de la conversación que no son del usuario actual
+        response = db.table("mensaje")\
+            .update({"leido": True})\
+            .eq("id_conversacion", id_conversacion)\
+            .neq("id_user", current_user["id_user"])\
+            .eq("leido", False)\
+            .execute()
+        
+        return {
+            "success": True,
+            "mensajes_actualizados": len(response.data) if response.data else 0,
+            "mensaje": "Mensajes marcados como leídos exitosamente"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/no-leidos", response_model=MensajesNoLeidos)
 async def get_mensajes_no_leidos(
     db: Client = Depends(get_db),

@@ -110,6 +110,7 @@ class Mensaje(MensajeBase):
     id_user: str
     fecha_envio: datetime
     leido: bool = False
+    editado: Optional[bool] = False
     usuario: Optional[dict] = None  # Información del usuario
 
     class Config:

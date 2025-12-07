@@ -59,8 +59,8 @@ async def get_my_materias(
         
         id_grupo = est_response.data[0]["id_grupo"]
         
-        # Obtener materias del grupo
-        response = db.table("grupomateria").select("materia(*)").eq("id_grupo", id_grupo).execute()
+        # Obtener materias del grupo con información del docente
+        response = db.table("grupomateria").select("materia(*, docente:id_doc(ci_doc, usuario:id_user(*)))").eq("id_grupo", id_grupo).execute()
         materias = [item["materia"] for item in response.data if item.get("materia")]
         return materias
     except Exception as e:
