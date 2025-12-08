@@ -97,6 +97,11 @@ async def get_horario_grupo(
                 horario["materia"] = None
             horarios.append(horario)
         
+        return horarios
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.get("/estudiante/{ci_est}", response_model=List[Horario])
 async def get_horario_estudiante(
     ci_est: str,
