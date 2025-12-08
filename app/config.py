@@ -34,15 +34,7 @@ class Settings(BaseSettings):
     
     # Configuración de CORS
     CORS_ORIGINS: Optional[str] = '["http://localhost:3000", "http://127.0.0.1:3000"]'
-    BACKEND_CORS_ORIGINS: list = [
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:8000",
-        "https://backend-social-f3ob.onrender.com",
-        "*"  # Permitir todos los orígenes temporalmente para pruebas (REMOVER en producción)
-    ]
+    BACKEND_CORS_ORIGINS: list = ["*"]  # Permitir todos los orígenes
     
     # Configuración de archivos
     UPLOADS_DIR: str = "uploads"

@@ -20,10 +20,28 @@ async def create_grupo(
 ):
     """Crear un nuevo grupo"""
     try:
-        response = db.table("grupo").insert(grupo_data.dict()).execute()
+        # Convertir a dict y excluir None
+        data = grupo_data.dict(exclude_none=True)
+        print(f"📝 Creando grupo: {data}")
+        
+        response = db.table("grupo").insert(data).execute()
+        
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se pudo crear el grupo"
+            )
+        
+        print(f"✅ Grupo creado: {response.data[0]}")
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        print(f"❌ Error al crear grupo: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al crear grupo: {str(e)}"
+        )
 
 
 @router.get("", response_model=List[Grupo])
