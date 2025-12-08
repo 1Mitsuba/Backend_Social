@@ -139,11 +139,6 @@ async def get_horario_estudiante(
         return horarios
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-            horarios.append(horario)
-        
-        return horarios
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.put("/{id_horario}", response_model=Horario)
